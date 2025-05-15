@@ -1,6 +1,5 @@
+A New Document, nice
 
-User: Hello, how are you doing?
-Model (llama3.2): I'm just a language model, so I don't have emotions or feelings like humans do. However, I'm functioning properly and ready to assist you with any questions or tasks you may have! How can I help you today?
-
-User: Second prompt
-Model (llama3.2): It seems like you forgot to provide a second prompt. Could you please provide the next question or topic you'd like to discuss? I'm here to help!
+Let's see what this got to do?
+User: haha
+Model (llama3.2): It looks like you're in a good mood! Is there something I can help you with or would you like to chat?

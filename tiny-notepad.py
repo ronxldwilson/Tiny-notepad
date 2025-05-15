@@ -3,7 +3,7 @@ import requests
 import threading
 import json
 from datetime import datetime
-import os  # ⬅️ NEW IMPORT
+import os 
 
 def save_note():
     content = text.get("1.0", "end-1c")
@@ -27,6 +27,16 @@ def load_note():
             return f.read()
     except FileNotFoundError:
         return ""
+
+def get_local_ollama_models():
+    try:
+        response = requests.get("http://localhost:11434/api/tags")
+        response.raise_for_status()
+        data = response.json()
+        return [model["name"] for model in data.get("models", [])]
+    except Exception as e:
+        print(f"Error fetching models: {e}")
+        return []
 
 def generate_from_ollama():
     prompt = prompt_entry.get()
@@ -70,12 +80,22 @@ def stream_ollama_response(prompt, model):
 root = tk.Tk()
 root.title("Tiny Notepad with Ollama")
 
+models = get_local_ollama_models()
+if not models:
+    models = ["llama3.2"]  # fallback option
+
 selected_model = tk.StringVar()
 selected_model.set("llama3.2")
 
 prompt_frame = tk.Frame(root)
 
-models = ["llama3", "llama3.2", "mistral", "deepseek", "gemma", "codellama"]
+models = get_local_ollama_models()
+if not models:
+    models = ["llama3.2"]  # fallback if API fails
+
+selected_model = tk.StringVar()
+selected_model.set(models[0] if models else "")
+
 tk.Label(prompt_frame, text="Model:").pack(side="left", padx=(0, 4))
 model_menu = tk.OptionMenu(prompt_frame, selected_model, *models)
 model_menu.pack(side="left", padx=(0, 8))
@@ -91,7 +111,10 @@ tk.Button(prompt_frame, text="Generate", command=generate_from_ollama).pack(side
 text = tk.Text(root, wrap="word", font=("Consolas", 12), undo=True)
 text.pack(expand=True, fill="both")
 
-text.insert("1.0", load_note())
+text.insert("1.0", "") 
 
 root.protocol("WM_DELETE_WINDOW", lambda: (save_note(), root.destroy()))
 root.mainloop()
+
+
+

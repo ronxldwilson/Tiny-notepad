@@ -2,4 +2,4 @@ This text editor enables to chat with ollama in a notepad, and save the output d
 
 Step 1: Ensure ollama is serveing on port 11434
 
-Step 2: Run >> python gui-notepad.py
+Step 2: Run >> python tiny-notepad.py
