@@ -1,17 +1,66 @@
 
 import tkinter as tk
+import requests
+import threading
+import json
 
 def save_note():
     with open("note.txt", "w", encoding="utf-8") as f:
         f.write(text.get("1.0", "end-1c"))
 
-root = tk.Tk()
-root.title("Tiny Notepad")
+def load_note():
+    try:
+        with open("note.txt", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return ""
 
+def generate_from_ollama():
+    prompt = prompt_entry.get()
+    if not prompt.strip():
+        return
+    threading.Thread(target=stream_ollama_response, args=(prompt,), daemon=True).start()
+
+def stream_ollama_response(prompt):
+    url = "http://localhost:11434/api/generate"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "model": "llama3.2",  # or any model you’ve pulled via ollama
+        "prompt": prompt,
+        "stream": True
+    }
+
+    with requests.post(url, json=payload, stream=True, headers=headers) as response:
+        for line in response.iter_lines():
+            if line:
+                try:
+                    data = json.loads(line.decode("utf-8"))
+                    text.insert("end", data.get("response", ""))
+                    text.see("end")
+                except json.JSONDecodeError:
+                    continue
+
+# GUI
+root = tk.Tk()
+root.title("Tiny Notepad with Ollama")
+
+# Prompt input
+prompt_frame = tk.Frame(root)
+prompt_frame.pack(fill="x", padx=8, pady=4)
+
+tk.Label(prompt_frame, text="Prompt:").pack(side="left")
+prompt_entry = tk.Entry(prompt_frame, width=50)
+prompt_entry.pack(side="left", fill="x", expand=True, padx=4)
+
+tk.Button(prompt_frame, text="Generate", command=generate_from_ollama).pack(side="right")
+
+# Text area
 text = tk.Text(root, wrap="word", font=("Consolas", 12), undo=True)
 text.pack(expand=True, fill="both")
 
-text.insert("1.0", open("note.txt", encoding="utf-8").read() if open("note.txt", "a+").tell() > 0 else "")
+# Load previous note
+text.insert("1.0", load_note())
 
+# Save on exit
 root.protocol("WM_DELETE_WINDOW", lambda: (save_note(), root.destroy()))
 root.mainloop()
