@@ -19,26 +19,40 @@ def generate_from_ollama():
     prompt = prompt_entry.get()
     if not prompt.strip():
         return
+    
+    # Insert the prompt with User label
+    text.insert("end", f"\nUser: {prompt.strip()}\n")
+    text.insert("end", f"Model (llama3.2): ")
+    text.see("end")
+    prompt_entry.delete(0, "end")  # Clear the prompt entry
+
     threading.Thread(target=stream_ollama_response, args=(prompt,), daemon=True).start()
 
 def stream_ollama_response(prompt):
     url = "http://localhost:11434/api/generate"
     headers = {"Content-Type": "application/json"}
     payload = {
-        "model": "llama3.2",  # or any model you’ve pulled via ollama
+        "model": "llama3.2",  # or the model you are using
         "prompt": prompt,
         "stream": True
     }
 
-    with requests.post(url, json=payload, stream=True, headers=headers) as response:
-        for line in response.iter_lines():
-            if line:
-                try:
-                    data = json.loads(line.decode("utf-8"))
-                    text.insert("end", data.get("response", ""))
-                    text.see("end")
-                except json.JSONDecodeError:
-                    continue
+    try:
+        with requests.post(url, json=payload, stream=True, headers=headers) as response:
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        data = json.loads(line.decode("utf-8"))
+                        text.insert("end", data.get("response", ""))
+                        text.see("end")
+                    except json.JSONDecodeError:
+                        continue
+        # Add a line break after response
+        text.insert("end", "\n")
+        text.see("end")
+    except Exception as e:
+        text.insert("end", f"\n[Error connecting to Ollama: {e}]\n")
+        text.see("end")
 
 # GUI
 root = tk.Tk()

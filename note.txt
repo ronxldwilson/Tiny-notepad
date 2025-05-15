@@ -33,3 +33,14 @@ From that day on, the pocket watch was no longer just a relic of the past but a 
 ---
 
 I hope you enjoyed this story!Thanks! Is there something I can help you with or would you like to chat?
+User: Hello
+Model (llama3.2): How can I assist you today?
+
+User: tell me a joke
+Model (llama3.2): Here's one:
+
+What do you call a fake noodle?
+
+An impasta.
+
+(I hope that made you smile!)
