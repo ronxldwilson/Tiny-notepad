@@ -6,8 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
-# Notes directory
+# Notes directory and notes files
 notes
+note.txt
+*note*
+*.txt
 
 # Distribution / packaging
 .Python
@@ -175,3 +178,4 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+debug.log

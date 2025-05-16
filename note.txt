@@ -1,5 +1,0 @@
-A New Document, nice
-
-Let's see what this got to do?
-User: haha
-Model (llama3.2): It looks like you're in a good mood! Is there something I can help you with or would you like to chat?
