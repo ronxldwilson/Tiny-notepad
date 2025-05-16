@@ -96,37 +96,58 @@ def stream_ollama_response(prompt, model):
 # --- GUI setup ---
 root = tk.Tk()
 root.title("Tiny Notepad with Ollama")
+root.configure(bg="#1e1e1e")  # Dark background for root window
+
+# Shared dark mode styles
+BG_COLOR = "#1e1e1e"
+FG_COLOR = "#ffffff"
+ENTRY_BG = "#2d2d2d"
+ENTRY_FG = "#ffffff"
+TEXT_BG = "#1e1e1e"
+TEXT_FG = "#ffffff"
+HIGHLIGHT_COLOR = "#444444"
 
 # Status Label
-status_label = tk.Label(root, text="Checking Ollama status...", anchor="w", fg="white", bg="black", font=("Segoe UI", 10, "bold"))
+status_label = tk.Label(
+    root,
+    text="Checking Ollama status...",
+    anchor="w",
+    fg=FG_COLOR,
+    bg=BG_COLOR,
+    font=("Segoe UI", 10, "bold")
+)
 status_label.pack(fill="x", padx=8, pady=(4, 0))
 
 # Start service check
 ensure_ollama_running()
 
 # Prompt UI
-prompt_frame = tk.Frame(root)
+prompt_frame = tk.Frame(root, bg=BG_COLOR)
 prompt_frame.pack(fill="x", padx=8, pady=4)
 
-tk.Label(prompt_frame, text="Model:").pack(side="left", padx=(0, 4))
+tk.Label(prompt_frame, text="Model:", fg=FG_COLOR, bg=BG_COLOR).pack(side="left", padx=(0, 4))
 models = get_local_ollama_models()
 if not models:
     models = ["llama3.2"]
 selected_model = tk.StringVar()
 selected_model.set(models[0])
 model_menu = tk.OptionMenu(prompt_frame, selected_model, *models)
+model_menu.configure(bg=ENTRY_BG, fg=ENTRY_FG, highlightbackground=HIGHLIGHT_COLOR, activebackground="#3e3e3e")
+model_menu["menu"].configure(bg=ENTRY_BG, fg=ENTRY_FG)
 model_menu.pack(side="left", padx=(0, 8))
 
-tk.Label(prompt_frame, text="Prompt:").pack(side="left")
-prompt_entry = tk.Entry(prompt_frame, width=50)
+tk.Label(prompt_frame, text="Prompt:", fg=FG_COLOR, bg=BG_COLOR).pack(side="left")
+prompt_entry = tk.Entry(prompt_frame, width=50, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground=FG_COLOR)
 prompt_entry.pack(side="left", fill="x", expand=True, padx=4)
 
-tk.Button(prompt_frame, text="Generate", command=generate_from_ollama).pack(side="right")
+tk.Button(prompt_frame, text="Generate", command=generate_from_ollama, bg="#3a3a3a", fg="#ffffff", activebackground="#555555").pack(side="right")
 
 # Text widget
-text = tk.Text(root, wrap="word", font=("Consolas", 12), undo=True)
+text = tk.Text(root, wrap="word", font=("Consolas", 12), undo=True,
+               bg=TEXT_BG, fg=TEXT_FG, insertbackground=FG_COLOR)
 text.pack(expand=True, fill="both")
 text.insert("1.0", load_note())
 
+# Exit handler
 root.protocol("WM_DELETE_WINDOW", lambda: (save_note(), root.destroy()))
 root.mainloop()
