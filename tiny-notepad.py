@@ -52,27 +52,27 @@ def ensure_ollama_running():
         try:
             response = requests.get("http://localhost:11434", timeout=1)
             if response.status_code == 200:
-                safe_update("🟢 Ollama is running")
+                safe_update("Ollama is running")
                 return
         except requests.ConnectionError:
-            safe_update("🔴 Ollama not running. Starting...")
+            safe_update("Ollama not running. Starting...")
 
         try:
             subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            safe_update("🟡 Starting Ollama...")
+            safe_update("Starting Ollama...")
             time.sleep(2)  # Let it boot
 
             # Retry once
             try:
                 response = requests.get("http://localhost:11434", timeout=2)
                 if response.status_code == 200:
-                    safe_update("🟢 Ollama started successfully")
+                    safe_update("Ollama started successfully")
                 else:
-                    safe_update("🔴 Failed to connect to Ollama")
+                    safe_update("Failed to connect to Ollama")
             except Exception as e:
-                safe_update(f"🔴 Still can't connect: {e}")
+                safe_update(f"Still can't connect: {e}")
         except Exception as e:
-            safe_update(f"🔴 Error: {e}")
+            safe_update(f"Error: {e}")
 
     threading.Thread(target=check_and_start, daemon=True).start()
 
@@ -153,12 +153,72 @@ def stream_ollama_response(prompt, model):
         text.insert("end", f"\n[Error connecting to Ollama: {e}]\n")
         text.see("end")
 
+def apply_theme():
+    t = themes[current_theme]
+    root.configure(bg=t["bg"])
+    status_label.config(bg=t["bg"], fg=t["fg"])
+
+    prompt_frame.config(bg=t["bg"])
+    for child in prompt_frame.winfo_children():
+        if isinstance(child, tk.Label):
+            child.config(bg=t["bg"], fg=t["fg"])
+        elif isinstance(child, tk.Entry):
+            child.config(bg=t["entry_bg"], fg=t["entry_fg"], insertbackground=t["fg"])
+        elif isinstance(child, tk.OptionMenu):
+            child.config(bg=t["entry_bg"], fg=t["entry_fg"], highlightbackground=t["highlight"])
+            child["menu"].config(bg=t["entry_bg"], fg=t["entry_fg"])
+        elif isinstance(child, tk.Button):
+            child.config(bg=t["button_bg"], fg=t["fg"])
+
+    main_frame.config(bg=t["bg"])
+    sidebar.config(bg=t["sidebar"])
+    note_listbox.config(bg=t["listbox"], fg=t["fg"], selectbackground=t["select_bg"])
+    text.config(bg=t["text_bg"], fg=t["text_fg"], insertbackground=t["fg"])
+    toggle_button.config(bg=t["button_bg"], fg=t["fg"])
+
+def toggle_theme():
+    global current_theme
+    current_theme = "light" if current_theme == "dark" else "dark"
+    apply_theme()
+
 
 # --- GUI setup ---
 root = tk.Tk()
 root.title("Tiny Notepad with Ollama")
 root.geometry("1000x600")  # Optional: increase size
 root.configure(bg="#1e1e1e")
+
+# Theme definitions
+themes = {
+    "dark": {
+        "bg": "#1e1e1e",
+        "fg": "#ffffff",
+        "entry_bg": "#2d2d2d",
+        "entry_fg": "#ffffff",
+        "text_bg": "#1e1e1e",
+        "text_fg": "#ffffff",
+        "highlight": "#444444",
+        "sidebar": "#2a2a2a",
+        "listbox": "#333333",
+        "select_bg": "#555555",
+        "button_bg": "#444444",
+    },
+    "light": {
+        "bg": "#f4f4f4",
+        "fg": "#000000",
+        "entry_bg": "#ffffff",
+        "entry_fg": "#000000",
+        "text_bg": "#ffffff",
+        "text_fg": "#000000",
+        "highlight": "#dddddd",
+        "sidebar": "#e0e0e0",
+        "listbox": "#ffffff",
+        "select_bg": "#c0c0c0",
+        "button_bg": "#cccccc",
+    },
+}
+current_theme = "dark"
+
 
 BG_COLOR = "#1e1e1e"
 FG_COLOR = "#ffffff"
@@ -172,6 +232,9 @@ HIGHLIGHT_COLOR = "#444444"
 status_label = tk.Label(root, text="Checking Ollama status...", anchor="w",
                         fg=FG_COLOR, bg=BG_COLOR, font=("Segoe UI", 10, "bold"))
 status_label.pack(fill="x", padx=8, pady=(4, 0))
+toggle_button = tk.Button(root, text="🌗 Toggle Theme", command=toggle_theme)
+toggle_button.pack(padx=8, pady=4, anchor="ne")
+
 root.after(100, ensure_ollama_running)
 
 # Prompt Frame
@@ -233,6 +296,9 @@ tk.Label(prompt_frame, text="Prompt:", fg=FG_COLOR, bg=BG_COLOR).pack(side="left
 prompt_entry = tk.Entry(prompt_frame, width=50, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground=FG_COLOR)
 prompt_entry.pack(side="left", fill="x", expand=True, padx=4)
 
+prompt_entry.bind("<Return>", lambda event: generate_from_ollama())
+
+
 tk.Button(prompt_frame, text="Generate", command=generate_from_ollama,
           bg="#3a3a3a", fg="#ffffff", activebackground="#555555").pack(side="right")
 
@@ -241,15 +307,15 @@ main_frame = tk.Frame(root, bg=BG_COLOR)
 main_frame.pack(fill="both", expand=True)
 
 # --- NEW: Sidebar for notes ---
-sidebar = tk.Frame(main_frame, width=200, bg="#2a2a2a")
+sidebar = tk.Frame(main_frame, width=300, bg="#2a2a2a")
 sidebar.pack(side="left", fill="y")
+
+tk.Button(sidebar, text="📝 New Note", command=new_note, bg="#444444", fg="#ffffff").pack(fill="x", padx=8, pady=(0, 8))
 
 tk.Label(sidebar, text="📂 Saved Notes", fg=FG_COLOR, bg="#2a2a2a", font=("Segoe UI", 10, "bold")).pack(pady=(8, 4))
 note_listbox = tk.Listbox(sidebar, bg="#333333", fg="#ffffff", selectbackground="#555555", height=30)
 note_listbox.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 note_listbox.bind("<<ListboxSelect>>", load_selected_note)
-
-tk.Button(sidebar, text="📝 New Note", command=new_note, bg="#444444", fg="#ffffff").pack(fill="x", padx=8, pady=(0, 8))
 
 # --- Text area for notes ---
 text = tk.Text(main_frame, wrap="word", font=("Consolas", 12), undo=True,
@@ -262,4 +328,5 @@ refresh_note_list()
 
 # Exit save hook
 root.protocol("WM_DELETE_WINDOW", lambda: (save_note(), root.destroy()))
+apply_theme()
 root.mainloop()
