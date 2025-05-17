@@ -46,6 +46,7 @@ def refresh_note_list():
 def new_note():
     text.delete("1.0", "end")
     prompt_entry.delete(0, "end")
+    
 def ensure_ollama_running():
     def check_and_start():
         try:
@@ -107,7 +108,35 @@ def generate_from_ollama():
 def stream_ollama_response(prompt, model):
     url = "http://localhost:11434/api/generate"
     headers = {"Content-Type": "application/json"}
-    payload = {"model": model, "prompt": prompt, "stream": True}
+
+    try:
+        temperature = float(temp_var.get())
+        top_p = float(top_p_var.get())
+        top_k = int(top_k_var.get())
+        repeat_penalty = float(repeat_penalty_var.get())
+        presence_penalty = float(presence_penalty_var.get())
+        frequency_penalty = float(frequency_penalty_var.get())
+        stop_input = stop_var.get().strip()
+        stop_sequences = [s.strip() for s in stop_input.split(",")] if stop_input else None
+    except Exception as e:
+        text.insert("end", f"\n[Parameter error: {e}]\n")
+        return
+
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": True,
+        "temperature": temperature,
+        "top_p": top_p,
+        "top_k": top_k,
+        "repeat_penalty": repeat_penalty,
+        "presence_penalty": presence_penalty,
+        "frequency_penalty": frequency_penalty
+    }
+
+    if stop_sequences:
+        payload["stop"] = stop_sequences
+
     try:
         with requests.post(url, json=payload, stream=True, headers=headers) as response:
             for line in response.iter_lines():
@@ -123,6 +152,7 @@ def stream_ollama_response(prompt, model):
     except Exception as e:
         text.insert("end", f"\n[Error connecting to Ollama: {e}]\n")
         text.see("end")
+
 
 # --- GUI setup ---
 root = tk.Tk()
@@ -148,8 +178,48 @@ root.after(100, ensure_ollama_running)
 prompt_frame = tk.Frame(root, bg=BG_COLOR)
 prompt_frame.pack(fill="x", padx=8, pady=4)
 
+# --- Model parameters frame ---
+param_frame = tk.Frame(root, bg=BG_COLOR)
+param_frame.pack(fill="x", padx=8, pady=4)
+
+def add_param_control(label, var, from_, to_, resolution, side="left"):
+    frame = tk.Frame(param_frame, bg=BG_COLOR)
+    frame.pack(side=side, padx=(8, 8))
+    tk.Label(frame, text=label, fg=FG_COLOR, bg=BG_COLOR).pack()
+    scale = tk.Scale(frame, from_=from_, to=to_, resolution=resolution,
+                     orient="horizontal", variable=var,
+                     bg=BG_COLOR, fg=FG_COLOR, highlightbackground=BG_COLOR)
+    scale.pack()
+
+# Parameter variables
+temp_var = tk.DoubleVar(value=0.7)
+top_p_var = tk.DoubleVar(value=0.9)
+top_k_var = tk.IntVar(value=40)
+repeat_penalty_var = tk.DoubleVar(value=1.0)
+presence_penalty_var = tk.DoubleVar(value=0.0)
+frequency_penalty_var = tk.DoubleVar(value=0.0)
+stop_var = tk.StringVar(value="")  # comma-separated
+
+# Add all sliders
+add_param_control("Temperature", temp_var, 0.0, 2.0, 0.1)
+add_param_control("Top-p", top_p_var, 0.0, 1.0, 0.05)
+add_param_control("Top-k", top_k_var, 0, 100, 1)
+add_param_control("Repeat Penalty", repeat_penalty_var, 0.5, 2.0, 0.05)
+add_param_control("Presence Penalty", presence_penalty_var, -2.0, 2.0, 0.1)
+add_param_control("Frequency Penalty", frequency_penalty_var, -2.0, 2.0, 0.1)
+
+# Stop sequences entry (in a new line for better layout)
+stop_frame = tk.Frame(root, bg=BG_COLOR)
+stop_frame.pack(fill="x", padx=8, pady=2)
+tk.Label(stop_frame, text="Stop Sequences (comma-separated):", fg=FG_COLOR, bg=BG_COLOR).pack(side="left")
+stop_entry = tk.Entry(stop_frame, textvariable=stop_var, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground=FG_COLOR, width=60)
+stop_entry.pack(side="left", padx=8, fill="x", expand=True)
+
+
 tk.Label(prompt_frame, text="Model:", fg=FG_COLOR, bg=BG_COLOR).pack(side="left", padx=(0, 4))
+
 models = get_local_ollama_models()
+
 if not models:
     models = ["llama3.2"]
 selected_model = tk.StringVar()
