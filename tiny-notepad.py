@@ -7,15 +7,19 @@ import os
 import subprocess
 import time
 
+# Ensure notes directory exists
+NOTES_DIR = "notes"
+os.makedirs(NOTES_DIR, exist_ok=True)
+
 def save_note():
     content = text.get("1.0", "end-1c")
     with open("note.txt", "w", encoding="utf-8") as f:
         f.write(content)
-    os.makedirs("notes", exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = os.path.join("notes", f"notes_{timestamp}.txt")
+    filename = os.path.join(NOTES_DIR, f"notes_{timestamp}.txt")
     with open(filename, "w", encoding="utf-8") as f:
         f.write(content)
+    refresh_note_list()  # NEW: update sidebar
 
 def load_note():
     try:
@@ -24,33 +28,60 @@ def load_note():
     except FileNotFoundError:
         return ""
 
+def load_selected_note(event):
+    selected = note_listbox.curselection()
+    if selected:
+        note_file = note_listbox.get(selected[0])
+        with open(os.path.join(NOTES_DIR, note_file), "r", encoding="utf-8") as f:
+            text.delete("1.0", "end")
+            text.insert("1.0", f.read())
+
+def refresh_note_list():
+    note_listbox.delete(0, "end")
+    files = sorted(os.listdir(NOTES_DIR), reverse=True)
+    for f in files:
+        if f.endswith(".txt"):
+            note_listbox.insert("end", f)
+
+def new_note():
+    text.delete("1.0", "end")
+    prompt_entry.delete(0, "end")
 def ensure_ollama_running():
     def check_and_start():
         try:
             response = requests.get("http://localhost:11434", timeout=1)
             if response.status_code == 200:
-                update_status_label("🟢 Ollama is running")
+                safe_update("🟢 Ollama is running")
                 return
         except requests.ConnectionError:
-            update_status_label("🔴 Ollama not running. Starting...")
+            safe_update("🔴 Ollama not running. Starting...")
 
         try:
             subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            update_status_label("🟡 Starting Ollama...")
+            safe_update("🟡 Starting Ollama...")
             time.sleep(2)  # Let it boot
+
             # Retry once
-            response = requests.get("http://localhost:11434", timeout=1)
-            if response.status_code == 200:
-                update_status_label("🟢 Ollama started successfully")
-            else:
-                update_status_label("🔴 Failed to connect to Ollama")
+            try:
+                response = requests.get("http://localhost:11434", timeout=2)
+                if response.status_code == 200:
+                    safe_update("🟢 Ollama started successfully")
+                else:
+                    safe_update("🔴 Failed to connect to Ollama")
+            except Exception as e:
+                safe_update(f"🔴 Still can't connect: {e}")
         except Exception as e:
-            update_status_label(f"🔴 Error: {e}")
+            safe_update(f"🔴 Error: {e}")
 
     threading.Thread(target=check_and_start, daemon=True).start()
 
+
 def update_status_label(message):
-    root.after(0, lambda: status_label.config(text=message))
+    status_label.config(text=message)
+
+def safe_update(message):
+    root.after(0, lambda: update_status_label(message))
+
 
 def get_local_ollama_models():
     try:
@@ -96,9 +127,9 @@ def stream_ollama_response(prompt, model):
 # --- GUI setup ---
 root = tk.Tk()
 root.title("Tiny Notepad with Ollama")
-root.configure(bg="#1e1e1e")  # Dark background for root window
+root.geometry("1000x600")  # Optional: increase size
+root.configure(bg="#1e1e1e")
 
-# Shared dark mode styles
 BG_COLOR = "#1e1e1e"
 FG_COLOR = "#ffffff"
 ENTRY_BG = "#2d2d2d"
@@ -107,21 +138,13 @@ TEXT_BG = "#1e1e1e"
 TEXT_FG = "#ffffff"
 HIGHLIGHT_COLOR = "#444444"
 
-# Status Label
-status_label = tk.Label(
-    root,
-    text="Checking Ollama status...",
-    anchor="w",
-    fg=FG_COLOR,
-    bg=BG_COLOR,
-    font=("Segoe UI", 10, "bold")
-)
+# Status label
+status_label = tk.Label(root, text="Checking Ollama status...", anchor="w",
+                        fg=FG_COLOR, bg=BG_COLOR, font=("Segoe UI", 10, "bold"))
 status_label.pack(fill="x", padx=8, pady=(4, 0))
+root.after(100, ensure_ollama_running)
 
-# Start service check
-ensure_ollama_running()
-
-# Prompt UI
+# Prompt Frame
 prompt_frame = tk.Frame(root, bg=BG_COLOR)
 prompt_frame.pack(fill="x", padx=8, pady=4)
 
@@ -140,14 +163,33 @@ tk.Label(prompt_frame, text="Prompt:", fg=FG_COLOR, bg=BG_COLOR).pack(side="left
 prompt_entry = tk.Entry(prompt_frame, width=50, bg=ENTRY_BG, fg=ENTRY_FG, insertbackground=FG_COLOR)
 prompt_entry.pack(side="left", fill="x", expand=True, padx=4)
 
-tk.Button(prompt_frame, text="Generate", command=generate_from_ollama, bg="#3a3a3a", fg="#ffffff", activebackground="#555555").pack(side="right")
+tk.Button(prompt_frame, text="Generate", command=generate_from_ollama,
+          bg="#3a3a3a", fg="#ffffff", activebackground="#555555").pack(side="right")
 
-# Text widget
-text = tk.Text(root, wrap="word", font=("Consolas", 12), undo=True,
+# --- NEW: Main layout frame ---
+main_frame = tk.Frame(root, bg=BG_COLOR)
+main_frame.pack(fill="both", expand=True)
+
+# --- NEW: Sidebar for notes ---
+sidebar = tk.Frame(main_frame, width=200, bg="#2a2a2a")
+sidebar.pack(side="left", fill="y")
+
+tk.Label(sidebar, text="📂 Saved Notes", fg=FG_COLOR, bg="#2a2a2a", font=("Segoe UI", 10, "bold")).pack(pady=(8, 4))
+note_listbox = tk.Listbox(sidebar, bg="#333333", fg="#ffffff", selectbackground="#555555", height=30)
+note_listbox.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+note_listbox.bind("<<ListboxSelect>>", load_selected_note)
+
+tk.Button(sidebar, text="📝 New Note", command=new_note, bg="#444444", fg="#ffffff").pack(fill="x", padx=8, pady=(0, 8))
+
+# --- Text area for notes ---
+text = tk.Text(main_frame, wrap="word", font=("Consolas", 12), undo=True,
                bg=TEXT_BG, fg=TEXT_FG, insertbackground=FG_COLOR)
-text.pack(expand=True, fill="both")
-text.insert("1.0", load_note())
+text.pack(side="right", expand=True, fill="both")
 
-# Exit handler
+# Initial content
+text.insert("1.0", load_note())
+refresh_note_list()
+
+# Exit save hook
 root.protocol("WM_DELETE_WINDOW", lambda: (save_note(), root.destroy()))
 root.mainloop()
